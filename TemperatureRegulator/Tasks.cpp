@@ -2,7 +2,13 @@
 #include "Configuration.h"
 #include "xOS.h"
 
-uint8_t mainState = false;
+typedef enum {
+  STATE_STANDBY,
+  STATE_BUSY,
+  STATE_READY
+} MainState_t;
+bool regulatorStete = false;
+MainState_t mainState = STATE_STANDBY;
 
 uint8_t buttonMainSwitch = false;
 uint8_t buttonPlus = false;
@@ -47,8 +53,6 @@ void Task_Button(void) {
     }
   }
 
-  mainState = buttonMainSwitch;
-
   if (buttonPlus || buttonMinus) {
     pressCounter++;
   }
@@ -57,14 +61,14 @@ void Task_Button(void) {
   }
 }
 void Task_Timer(void) {
-  if (LED_ON == ledBusy) {
-    timeHeatingSeconds++;
-  }
-  if (LED_ON == ledStandby) {
-
-  }
-  if (LED_ON == ledReady) {
-    timeProcessSeconds++;
+  switch (mainState) {
+    case STATE_BUSY:
+      timeHeatingSeconds++;
+      break;
+    case STATE_READY:
+      timeProcessSeconds++;
+      break;
+    default: break;
   }
 }
 void Task_Regulator(void) {
@@ -85,8 +89,33 @@ void Task_Dimmer(void) {
   }
 }
 void Task_Main(void) {
-  if (mainState == true) {
-    ledBusy = LED_ON;
+  switch (mainState) {
+    case STATE_STANDBY:
+      ledStandby = LED_ON;
+      ledBusy = LED_OFF;
+      ledReady = LED_OFF;
+      if (buttonMainSwitch) {
+        mainState = STATE_BUSY;
+      }
+      break;
+    case STATE_BUSY:
+      ledStandby = LED_OFF;
+      ledBusy = LED_ON;
+      ledReady = LED_OFF;
+      //if(tempMeasured in range)
+      //mainState = STATE_READY;
+      break;
+    case STATE_READY:
+      ledStandby = LED_OFF;
+      ledBusy = LED_OFF;
+      ledReady = LED_ON;
+      //if(tempMeasured not in range)
+      //mainState = STATE_BUSY;
+      break;
+    default: break;
+  }
+  if (!buttonMainSwitch){
+    mainState = STATE_STANDBY;
   }
 }
 
