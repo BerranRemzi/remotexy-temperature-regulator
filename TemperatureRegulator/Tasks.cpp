@@ -1,6 +1,8 @@
 #include "Tasks.h"
 #include "Configuration.h"
 #include "xOS.h"
+#include <SPI.h>
+#include "max6675.h"
 
 typedef enum {
   STATE_STANDBY,
@@ -25,6 +27,10 @@ uint8_t ledReady = 0;
 uint32_t timeHeatingSeconds = 0;
 uint32_t timeProcessSeconds = 0;
 
+uint16_t Dimmer_counter = 0;
+uint16_t Dimmer_value = 0;
+
+MAX6675 Sensor(SENSOR_CLK_PIN, SENSOR_CS_PIN, SENSOR_DO_PIN);
 Task_t TaskStruct[5];
 
 void Task_Init(void) {
@@ -32,7 +38,7 @@ void Task_Init(void) {
 
   xTaskCreate(&Task_Button, 10);
   xTaskCreate(&Task_Timer, 1000);
-  xTaskCreate(&Task_Regulator, 10);
+  xTaskCreate(&Task_Regulator, 500);
   xTaskCreate(&Task_Dimmer, 10);
   xTaskCreate(&Task_Main, 10);
 
@@ -72,12 +78,17 @@ void Task_Timer(void) {
   }
 }
 void Task_Regulator(void) {
-
+  tempMeasured = round(Sensor.readCelsius());
+#ifdef REGULATOR_TYPE_HYST
+  Dimmer_value = Regulator_Hyst_GetResult(tempSetpoint, tempMeasured);
+#else
+  Dimmer_value = Regulator_PID_GetResult(tempSetpoint, tempMeasured);
+#endif
 }
-uint16_t Dimmer_counter = 0;
-uint16_t Dimmer_value = 0;
+
+
 void Task_Dimmer(void) {
-  if (Dimmer_counter <= Dimmer_value) {
+  if ((Dimmer_counter <= Dimmer_value) && (true == buttonMainSwitch)) {
     digitalWrite(DIMMER_PIN, HIGH);
   } else {
     digitalWrite(DIMMER_PIN, LOW);
@@ -89,36 +100,73 @@ void Task_Dimmer(void) {
   }
 }
 void Task_Main(void) {
+
+
+  if (false == buttonMainSwitch) {
+    mainState = STATE_STANDBY;
+  }
+
   switch (mainState) {
     case STATE_STANDBY:
-      ledStandby = LED_ON;
-      ledBusy = LED_OFF;
-      ledReady = LED_OFF;
       if (buttonMainSwitch) {
         mainState = STATE_BUSY;
       }
       break;
     case STATE_BUSY:
-      ledStandby = LED_OFF;
-      ledBusy = LED_ON;
-      ledReady = LED_OFF;
-      //if(tempMeasured in range)
-      //mainState = STATE_READY;
+      if (true == Core_IsTemperatureInRange()) {
+        mainState = STATE_READY;
+      }
       break;
     case STATE_READY:
-      ledStandby = LED_OFF;
-      ledBusy = LED_OFF;
-      ledReady = LED_ON;
-      //if(tempMeasured not in range)
-      //mainState = STATE_BUSY;
+      if (false == Core_IsTemperatureInRange()) {
+        mainState = STATE_BUSY;
+      }
       break;
     default: break;
   }
-  if (!buttonMainSwitch){
-    mainState = STATE_STANDBY;
-  }
+
+  Core_UpdateLeds();
 }
 
+int16_t Regulator_Hyst_GetResult(int16_t _tempSetpoint, int16_t _tempMeasured) {
+  int16_t returnValue = 0;
+  if (_tempMeasured < (_tempSetpoint - TEMP_REG_HALF_HYST)) {
+    returnValue = DIMMER_MAX;
+  } else if (_tempMeasured > (_tempSetpoint + TEMP_REG_HALF_HYST)) {
+    returnValue = DIMMER_MIN;
+  }
+  return (returnValue);
+}
+int16_t Regulator_PID_GetResult(int16_t _tempSetpoint, int16_t _tempMeasured) {
+  int16_t returnValue = 0;
+  return (returnValue);
+}
+bool Core_IsTemperatureInRange(void) {
+  bool measuredTempInRange = false;
+  if ((tempMeasured > (tempSetpoint - TEMP_READY_HALF_HYST))
+      && (tempMeasured < (tempSetpoint + TEMP_READY_HALF_HYST))) {
+    measuredTempInRange = true;
+  }
+  return (measuredTempInRange);
+}
+void Core_UpdateLeds(void) {
+  ledStandby = LED_OFF;
+  ledBusy = LED_OFF;
+  ledReady = LED_OFF;
+
+  switch (mainState) {
+    case STATE_STANDBY:
+      ledStandby = LED_ON;
+      break;
+    case STATE_BUSY:
+      ledBusy = LED_ON;
+      break;
+    case STATE_READY:
+      ledReady = LED_ON;
+      break;
+    default: break;
+  }
+}
 
 void Core_Read_MainSwitch(uint8_t *_input) {
   buttonMainSwitch = *_input;

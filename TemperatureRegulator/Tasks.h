@@ -8,6 +8,11 @@ void Task_Dimmer(void);
 void Task_Main(void);
 void Task_Init(void);
 
+int16_t Regulator_Hyst_GetResult(int16_t _tempSetpoint, int16_t _tempMeasured);
+int16_t Regulator_PID_GetResult(int16_t _tempSetpoint, int16_t _tempMeasured);
+
+bool Core_IsTemperatureInRange(void);
+void Core_UpdateLeds(void);
 void Core_Read_MainSwitch(uint8_t *_input);
 void Core_Read_ButtonPlus(uint8_t *_input);
 void Core_Read_ButtonMinus(uint8_t *_input);
