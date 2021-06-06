@@ -138,7 +138,18 @@ int16_t Regulator_Hyst_GetResult(int16_t _tempSetpoint, int16_t _tempMeasured) {
   return (returnValue);
 }
 int16_t Regulator_PID_GetResult(int16_t _tempSetpoint, int16_t _tempMeasured) {
-  int16_t returnValue = 0;
+  double _Kp = KP;
+  double _Ki = KI;
+  double _dT = DT;
+  double _error = _tempSetpoint - _tempMeasured;
+  static double _integral = 0;
+  static double _previousError = 0;
+  _integral += (_error + _previousError) / 2 * _dT / 1000.0;   //Riemann sum integral
+  _previousError = _error;
+  double PID = (_Kp * _error) + (_Ki * _integral);
+  int16_t returnValue = (int16_t)PID;
+  
+  constrain(returnValue, DIMMER_MIN, DIMMER_MAX)
   return (returnValue);
 }
 bool Core_IsTemperatureInRange(void) {

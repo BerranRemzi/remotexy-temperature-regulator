@@ -1,4 +1,6 @@
 #pragma once
+#include "Arduino.h"
+#include <ESP8266WiFi.h>
 
 #define DIMMER_PIN LED_BUILTIN
 
@@ -11,6 +13,7 @@
 #define PID_TASK_MS 500
 #define KP 5
 #define KI 1
+#define DT 1000
 
 /*
  * Regulator hysteresis
